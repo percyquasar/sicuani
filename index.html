@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CHUMO</title>
+    <title>CHUMO - Visor de Nube de Puntos</title>
     
-    <!-- CAMBIAR ESTA URL POR TU ARCHIVE.ORG -->
+    <!-- Cargar Potree desde Archive.org -->
     <link rel="stylesheet" href="https://archive.org/download/modulos_202601/libs/potree/potree.css">
     <script src="https://archive.org/download/modulos_202601/libs/potree/potree.js"></script>
-
     
     <style>
         * {
@@ -121,14 +120,14 @@
     <div id="potree_render_area">
         <div class="loading-container" id="loading">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Cargando nube de puntos PERCY...</div>
+            <div class="loading-text">Cargando nube de puntos CHUMO...</div>
         </div>
     </div>
     
     <div id="potree_sidebar_container"></div>
     
     <div class="info-panel">
-        <h3>PERCY Point Cloud</h3>
+        <h3>CHUMO Point Cloud</h3>
         <p><strong>Proyecto:</strong> PERCY Group 1</p>
         <p><strong>Puntos:</strong> <span id="point-count">Calculando...</span></p>
         <p><strong>Controles:</strong></p>
@@ -146,6 +145,105 @@
         
         // ==========================================
         // INICIALIZACIÓN DEL VISOR
-        // ======================
-
-
+        // ==========================================
+        window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
+        
+        // Configuración del visor
+        viewer.setEDLEnabled(true);
+        viewer.setFOV(60);
+        viewer.setPointBudget(2_000_000); // Ajusta según rendimiento
+        viewer.setBackground("gradient"); // Opciones: "gradient", "black", "white", "skybox"
+        viewer.loadSettingsFromURL();
+        
+        // Descripción del proyecto
+        viewer.setDescription(`
+            <h2>CHUMO - Nube de Puntos Densificada</h2>
+            <p>Visualización interactiva de la nube de puntos procesada.</p>
+            <p>Fecha: Enero 2026</p>
+        `);
+        
+        // ==========================================
+        // CARGAR NUBE DE PUNTOS
+        // ==========================================
+        const pointcloudUrl = ARCHIVE_BASE_URL + POINTCLOUD_PATH + "metadata.json";
+        
+        Potree.loadPointCloud(pointcloudUrl, "PERCY", function(e) {
+            let pointcloud = e.pointcloud;
+            let material = pointcloud.material;
+            
+            // Añadir al escenario
+            viewer.scene.addPointCloud(pointcloud);
+            
+            // Configuración del material
+            material.size = 1.0;
+            material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
+            material.shape = Potree.PointShape.CIRCLE;
+            
+            // Ajustar vista a la nube de puntos
+            viewer.fitToScreen();
+            
+            // Actualizar contador de puntos
+            const numPoints = pointcloud.numVisiblePoints;
+            document.getElementById('point-count').textContent = numPoints.toLocaleString('es-ES');
+            
+            // Ocultar loading
+            document.getElementById('loading').style.display = 'none';
+            
+            console.log("Nube de puntos cargada exitosamente");
+            console.log("Número de puntos:", numPoints);
+            
+        }).catch(function(error) {
+            console.error("Error al cargar la nube de puntos:", error);
+            document.querySelector('.loading-text').textContent = 
+                "Error al cargar. Verifica la URL de Archive.org";
+            document.querySelector('.loading-spinner').style.display = 'none';
+        });
+        
+        // ==========================================
+        // CARGAR INTERFAZ GRÁFICA
+        // ==========================================
+        viewer.loadGUI(() => {
+            viewer.setLanguage('es');
+            $("#menu_appearance").next().show();
+            $("#menu_tools").next().show();
+            $("#menu_scene").next().show();
+        });
+        
+        // ==========================================
+        // FUNCIONES ADICIONALES
+        // ==========================================
+        
+        // Actualizar información en tiempo real
+        viewer.addEventListener("update", function() {
+            const numVisiblePoints = viewer.scene.pointclouds[0]?.numVisiblePoints;
+            if (numVisiblePoints) {
+                document.getElementById('point-count').textContent = 
+                    numVisiblePoints.toLocaleString('es-ES');
+            }
+        });
+        
+        // Atajos de teclado personalizados
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case 'f': // F - Fit to screen
+                    viewer.fitToScreen();
+                    break;
+                case 'r': // R - Reset camera
+                    viewer.scene.view.position.set(0, 0, 10);
+                    viewer.scene.view.lookAt(new THREE.Vector3(0, 0, 0));
+                    break;
+                case 'c': // C - Toggle classification
+                    let pc = viewer.scene.pointclouds[0];
+                    if (pc) {
+                        pc.material.activeAttributeName = 
+                            pc.material.activeAttributeName === 'rgba' ? 'classification' : 'rgba';
+                    }
+                    break;
+            }
+        });
+        
+        console.log("Potree Viewer inicializado");
+        console.log("Atajos: F=ajustar, R=reset cámara, C=cambiar colores");
+    </script>
+</body>
+</html>
