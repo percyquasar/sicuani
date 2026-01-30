@@ -5,11 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CHUMO - Visor de Nube de Puntos</title>
     
-    <!-- Dependencias necesarias -->
+    <!-- Dependencias en el orden correcto -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.7.5/proj4.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/openlayers@4.6.5/dist/ol.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@5.16.0/dist/d3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jstree@3.3.12/dist/jstree.min.js"></script>
     
-    <!-- Potree desde GitHub Pages oficial -->
+    <!-- Potree -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jstree@3.3.12/dist/themes/default/style.min.css">
     <link rel="stylesheet" href="https://potree.github.io/potree/build/potree/potree.css">
     <script src="https://potree.github.io/potree/build/potree/potree.js"></script>
     
@@ -104,7 +109,6 @@
             line-height: 1.4;
         }
         
-        /* Scrollbar personalizado */
         #potree_sidebar_container::-webkit-scrollbar {
             width: 8px;
         }
@@ -154,58 +158,56 @@
     </div>
 
     <script>
-        // Función para mostrar errores
         function showError(message) {
             console.error(message);
-            document.querySelector('.loading-text').textContent = 'Error de carga';
-            document.getElementById('error-msg').textContent = message;
-            document.getElementById('error-msg').style.display = 'block';
-            document.querySelector('.loading-spinner').style.display = 'none';
+            const loadingText = document.querySelector('.loading-text');
+            const errorMsg = document.getElementById('error-msg');
+            const spinner = document.querySelector('.loading-spinner');
+            
+            if (loadingText) loadingText.textContent = 'Error de carga';
+            if (errorMsg) {
+                errorMsg.textContent = message;
+                errorMsg.style.display = 'block';
+            }
+            if (spinner) spinner.style.display = 'none';
         }
 
-        // Esperar a que carguen todas las dependencias
         function initPotree() {
-            // ==========================================
-            // VERIFICAR DEPENDENCIAS
-            // ==========================================
-            if (typeof jQuery === 'undefined') {
-                showError('jQuery no se cargó');
-                return;
-            }
-            
-            if (typeof THREE === 'undefined') {
-                showError('Three.js no se cargó');
-                return;
-            }
-            
-            if (typeof Potree === 'undefined') {
-                showError('Potree no se cargó. Verifica tu conexión a internet.');
-                return;
+            // Verificar dependencias
+            const dependencies = {
+                'jQuery': typeof jQuery !== 'undefined',
+                'THREE': typeof THREE !== 'undefined',
+                'proj4': typeof proj4 !== 'undefined',
+                'Potree': typeof Potree !== 'undefined'
+            };
+
+            console.log('Estado de dependencias:', dependencies);
+
+            for (let [name, loaded] of Object.entries(dependencies)) {
+                if (!loaded) {
+                    showError(`${name} no se cargó correctamente`);
+                    return;
+                }
             }
 
-            console.log('✓ Todas las dependencias cargadas correctamente');
-            document.querySelector('.loading-text').textContent = 'Cargando nube de puntos...';
+            console.log('✓ Todas las dependencias cargadas');
             
-            // ==========================================
-            // CONFIGURACIÓN
-            // ==========================================
+            const loadingText = document.querySelector('.loading-text');
+            if (loadingText) loadingText.textContent = 'Cargando nube de puntos...';
+            
             const ARCHIVE_BASE_URL = "https://archive.org/download/chumo/";
             const POINTCLOUD_PATH = "pointclouds/PERCY/";
             
             try {
-                // ==========================================
-                // INICIALIZACIÓN DEL VISOR
-                // ==========================================
+                // Inicializar visor
                 window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
                 
-                // Configuración del visor
                 viewer.setEDLEnabled(true);
                 viewer.setFOV(60);
                 viewer.setPointBudget(2000000);
                 viewer.setBackground("gradient");
                 viewer.loadSettingsFromURL();
                 
-                // Descripción del proyecto
                 viewer.setDescription(`
                     <h2>CHUMO - Nube de Puntos Densificada</h2>
                     <p>Visualización interactiva de la nube de puntos procesada.</p>
@@ -214,107 +216,90 @@
                 
                 console.log('✓ Visor Potree inicializado');
                 
-                // ==========================================
-                // CARGAR NUBE DE PUNTOS
-                // ==========================================
+                // Cargar nube de puntos
                 const pointcloudUrl = ARCHIVE_BASE_URL + POINTCLOUD_PATH + "metadata.json";
                 console.log('Cargando desde:', pointcloudUrl);
                 
                 Potree.loadPointCloud(pointcloudUrl, "PERCY", function(e) {
-                    console.log('✓ Callback de carga ejecutado');
+                    console.log('✓ Callback ejecutado');
                     
                     let pointcloud = e.pointcloud;
                     let material = pointcloud.material;
                     
-                    // Añadir al escenario
                     viewer.scene.addPointCloud(pointcloud);
                     
-                    // Configuración del material
                     material.size = 1.0;
                     material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
                     material.shape = Potree.PointShape.CIRCLE;
                     
-                    // Ajustar vista a la nube de puntos
                     viewer.fitToScreen();
                     
-                    // Actualizar contador de puntos
                     const numPoints = pointcloud.numVisiblePoints;
-                    document.getElementById('point-count').textContent = 
-                        numPoints.toLocaleString('es-ES');
+                    const pointCountEl = document.getElementById('point-count');
+                    if (pointCountEl) {
+                        pointCountEl.textContent = numPoints.toLocaleString('es-ES');
+                    }
                     
-                    // Ocultar loading
-                    document.getElementById('loading').style.display = 'none';
+                    const loadingEl = document.getElementById('loading');
+                    if (loadingEl) loadingEl.style.display = 'none';
                     
-                    console.log('✓ Nube de puntos cargada exitosamente');
-                    console.log('✓ Número de puntos:', numPoints);
+                    console.log('✓ Nube cargada:', numPoints, 'puntos');
                     
                 }).catch(function(error) {
-                    showError('No se pudo cargar la nube de puntos desde Archive.org. ' + 
-                             'Verifica que los archivos estén correctamente subidos.');
-                    console.error('Error detallado:', error);
+                    showError('Error al cargar desde Archive.org. Verifica la URL.');
+                    console.error('Error:', error);
                 });
                 
-                // ==========================================
-                // CARGAR INTERFAZ GRÁFICA
-                // ==========================================
+                // Cargar GUI
                 viewer.loadGUI(() => {
                     viewer.setLanguage('es');
                     console.log('✓ GUI cargada');
                 });
                 
-                // ==========================================
-                // FUNCIONES ADICIONALES
-                // ==========================================
-                
-                // Actualizar información en tiempo real
+                // Event listeners
                 viewer.addEventListener("update", function() {
                     if (viewer.scene.pointclouds[0]) {
                         const numVisiblePoints = viewer.scene.pointclouds[0].numVisiblePoints;
-                        if (numVisiblePoints) {
-                            document.getElementById('point-count').textContent = 
-                                numVisiblePoints.toLocaleString('es-ES');
+                        const pointCountEl = document.getElementById('point-count');
+                        if (numVisiblePoints && pointCountEl) {
+                            pointCountEl.textContent = numVisiblePoints.toLocaleString('es-ES');
                         }
                     }
                 });
                 
-                // Atajos de teclado personalizados
+                // Atajos de teclado
                 document.addEventListener('keydown', function(e) {
                     if (!viewer.scene.pointclouds[0]) return;
                     
                     switch(e.key.toLowerCase()) {
-                        case 'f': // F - Fit to screen
+                        case 'f':
                             viewer.fitToScreen();
-                            console.log('Vista ajustada');
                             break;
-                        case 'r': // R - Reset camera
+                        case 'r':
                             viewer.scene.view.position.set(0, 0, 10);
                             viewer.scene.view.lookAt(new THREE.Vector3(0, 0, 0));
-                            console.log('Cámara reseteada');
                             break;
-                        case 'c': // C - Toggle classification
+                        case 'c':
                             let pc = viewer.scene.pointclouds[0];
                             let material = pc.material;
                             material.activeAttributeName = 
                                 material.activeAttributeName === 'rgba' ? 'classification' : 'rgba';
-                            console.log('Modo de color:', material.activeAttributeName);
                             break;
                     }
                 });
                 
-                console.log('✓ Sistema de atajos activado');
+                console.log('✓ Todo inicializado correctamente');
                 
             } catch (error) {
-                showError('Error al inicializar el visor: ' + error.message);
+                showError('Error: ' + error.message);
+                console.error('Error completo:', error);
             }
         }
 
-        // Iniciar cuando todo esté cargado
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initPotree);
-        } else {
-            // Esperar un poco para asegurar que los scripts externos carguen
-            setTimeout(initPotree, 500);
-        }
+        // Esperar a que cargue todo
+        window.addEventListener('load', function() {
+            setTimeout(initPotree, 1000);
+        });
     </script>
 </body>
 </html>
