@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CHUMO - Visor de Nube de Puntos</title>
     
-    <!-- Cargar Potree desde CDN oficial -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/potree-core@2.0.0/build/potree/potree.css">
-    <script src="https://cdn.jsdelivr.net/npm/potree-core@2.0.0/build/potree/potree.js"></script>
-    
-    <!-- También necesitamos jQuery y Three.js -->
+    <!-- Dependencias necesarias -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    
+    <!-- Potree desde GitHub Pages oficial -->
+    <link rel="stylesheet" href="https://potree.github.io/potree/build/potree/potree.css">
+    <script src="https://potree.github.io/potree/build/potree/potree.js"></script>
     
     <style>
         * {
@@ -54,6 +54,9 @@
             text-align: center;
             color: white;
             z-index: 2000;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 30px;
+            border-radius: 10px;
         }
         
         .loading-spinner {
@@ -118,13 +121,20 @@
         #potree_sidebar_container::-webkit-scrollbar-thumb:hover {
             background: rgba(255, 255, 255, 0.7);
         }
+
+        .error-message {
+            color: #ff6b6b;
+            margin-top: 15px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div id="potree_render_area">
         <div class="loading-container" id="loading">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Cargando nube de puntos CHUMO...</div>
+            <div class="loading-text">Inicializando visor...</div>
+            <div class="error-message" id="error-msg" style="display:none;"></div>
         </div>
     </div>
     
@@ -138,11 +148,43 @@
         <p>• Click izq: Rotar</p>
         <p>• Click der: Pan</p>
         <p>• Scroll: Zoom</p>
+        <p style="margin-top: 10px; font-size: 12px; opacity: 0.7;">
+            Atajos: F=ajustar | R=reset | C=colores
+        </p>
     </div>
 
     <script>
-        // Esperar a que todo cargue
-        window.addEventListener('DOMContentLoaded', function() {
+        // Función para mostrar errores
+        function showError(message) {
+            console.error(message);
+            document.querySelector('.loading-text').textContent = 'Error de carga';
+            document.getElementById('error-msg').textContent = message;
+            document.getElementById('error-msg').style.display = 'block';
+            document.querySelector('.loading-spinner').style.display = 'none';
+        }
+
+        // Esperar a que carguen todas las dependencias
+        function initPotree() {
+            // ==========================================
+            // VERIFICAR DEPENDENCIAS
+            // ==========================================
+            if (typeof jQuery === 'undefined') {
+                showError('jQuery no se cargó');
+                return;
+            }
+            
+            if (typeof THREE === 'undefined') {
+                showError('Three.js no se cargó');
+                return;
+            }
+            
+            if (typeof Potree === 'undefined') {
+                showError('Potree no se cargó. Verifica tu conexión a internet.');
+                return;
+            }
+
+            console.log('✓ Todas las dependencias cargadas correctamente');
+            document.querySelector('.loading-text').textContent = 'Cargando nube de puntos...';
             
             // ==========================================
             // CONFIGURACIÓN
@@ -150,134 +192,129 @@
             const ARCHIVE_BASE_URL = "https://archive.org/download/chumo/";
             const POINTCLOUD_PATH = "pointclouds/PERCY/";
             
-            // Verificar que Potree esté cargado
-            if (typeof Potree === 'undefined') {
-                console.error('Potree no se cargó correctamente');
-                document.querySelector('.loading-text').textContent = 
-                    'Error: No se pudo cargar Potree. Recarga la página.';
-                return;
-            }
-            
-            // ==========================================
-            // INICIALIZACIÓN DEL VISOR
-            // ==========================================
-            window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
-            
-            // Configuración del visor
-            viewer.setEDLEnabled(true);
-            viewer.setFOV(60);
-            viewer.setPointBudget(2000000);
-            viewer.setBackground("gradient");
-            viewer.loadSettingsFromURL();
-            
-            // Descripción del proyecto
-            viewer.setDescription(`
-                <h2>CHUMO - Nube de Puntos Densificada</h2>
-                <p>Visualización interactiva de la nube de puntos procesada.</p>
-                <p>Fecha: Enero 2026</p>
-            `);
-            
-            // ==========================================
-            // CARGAR NUBE DE PUNTOS
-            // ==========================================
-            const pointcloudUrl = ARCHIVE_BASE_URL + POINTCLOUD_PATH + "metadata.json";
-            
-            console.log("Intentando cargar desde:", pointcloudUrl);
-            
-            Potree.loadPointCloud(pointcloudUrl, "PERCY", function(e) {
-                let pointcloud = e.pointcloud;
-                let material = pointcloud.material;
+            try {
+                // ==========================================
+                // INICIALIZACIÓN DEL VISOR
+                // ==========================================
+                window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
                 
-                // Añadir al escenario
-                viewer.scene.addPointCloud(pointcloud);
+                // Configuración del visor
+                viewer.setEDLEnabled(true);
+                viewer.setFOV(60);
+                viewer.setPointBudget(2000000);
+                viewer.setBackground("gradient");
+                viewer.loadSettingsFromURL();
                 
-                // Configuración del material
-                material.size = 1.0;
-                material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
-                material.shape = Potree.PointShape.CIRCLE;
+                // Descripción del proyecto
+                viewer.setDescription(`
+                    <h2>CHUMO - Nube de Puntos Densificada</h2>
+                    <p>Visualización interactiva de la nube de puntos procesada.</p>
+                    <p>Fecha: Enero 2026</p>
+                `);
                 
-                // Ajustar vista a la nube de puntos
-                viewer.fitToScreen();
+                console.log('✓ Visor Potree inicializado');
                 
-                // Actualizar contador de puntos
-                const numPoints = pointcloud.numVisiblePoints;
-                document.getElementById('point-count').textContent = 
-                    numPoints.toLocaleString('es-ES');
+                // ==========================================
+                // CARGAR NUBE DE PUNTOS
+                // ==========================================
+                const pointcloudUrl = ARCHIVE_BASE_URL + POINTCLOUD_PATH + "metadata.json";
+                console.log('Cargando desde:', pointcloudUrl);
                 
-                // Ocultar loading
-                document.getElementById('loading').style.display = 'none';
+                Potree.loadPointCloud(pointcloudUrl, "PERCY", function(e) {
+                    console.log('✓ Callback de carga ejecutado');
+                    
+                    let pointcloud = e.pointcloud;
+                    let material = pointcloud.material;
+                    
+                    // Añadir al escenario
+                    viewer.scene.addPointCloud(pointcloud);
+                    
+                    // Configuración del material
+                    material.size = 1.0;
+                    material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
+                    material.shape = Potree.PointShape.CIRCLE;
+                    
+                    // Ajustar vista a la nube de puntos
+                    viewer.fitToScreen();
+                    
+                    // Actualizar contador de puntos
+                    const numPoints = pointcloud.numVisiblePoints;
+                    document.getElementById('point-count').textContent = 
+                        numPoints.toLocaleString('es-ES');
+                    
+                    // Ocultar loading
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    console.log('✓ Nube de puntos cargada exitosamente');
+                    console.log('✓ Número de puntos:', numPoints);
+                    
+                }).catch(function(error) {
+                    showError('No se pudo cargar la nube de puntos desde Archive.org. ' + 
+                             'Verifica que los archivos estén correctamente subidos.');
+                    console.error('Error detallado:', error);
+                });
                 
-                console.log("✓ Nube de puntos cargada exitosamente");
-                console.log("✓ Número de puntos:", numPoints);
+                // ==========================================
+                // CARGAR INTERFAZ GRÁFICA
+                // ==========================================
+                viewer.loadGUI(() => {
+                    viewer.setLanguage('es');
+                    console.log('✓ GUI cargada');
+                });
                 
-            }).catch(function(error) {
-                console.error("Error al cargar la nube de puntos:", error);
-                document.querySelector('.loading-text').innerHTML = 
-                    "Error al cargar desde Archive.org<br>Verifica que los archivos estén subidos correctamente";
-                document.querySelector('.loading-spinner').style.display = 'none';
-            });
-            
-            // ==========================================
-            // CARGAR INTERFAZ GRÁFICA
-            // ==========================================
-            viewer.loadGUI(() => {
-                viewer.setLanguage('es');
-                if ($("#menu_appearance").length) {
-                    $("#menu_appearance").next().show();
-                }
-                if ($("#menu_tools").length) {
-                    $("#menu_tools").next().show();
-                }
-                if ($("#menu_scene").length) {
-                    $("#menu_scene").next().show();
-                }
-            });
-            
-            // ==========================================
-            // FUNCIONES ADICIONALES
-            // ==========================================
-            
-            // Actualizar información en tiempo real
-            viewer.addEventListener("update", function() {
-                if (viewer.scene.pointclouds[0]) {
-                    const numVisiblePoints = viewer.scene.pointclouds[0].numVisiblePoints;
-                    if (numVisiblePoints) {
-                        document.getElementById('point-count').textContent = 
-                            numVisiblePoints.toLocaleString('es-ES');
+                // ==========================================
+                // FUNCIONES ADICIONALES
+                // ==========================================
+                
+                // Actualizar información en tiempo real
+                viewer.addEventListener("update", function() {
+                    if (viewer.scene.pointclouds[0]) {
+                        const numVisiblePoints = viewer.scene.pointclouds[0].numVisiblePoints;
+                        if (numVisiblePoints) {
+                            document.getElementById('point-count').textContent = 
+                                numVisiblePoints.toLocaleString('es-ES');
+                        }
                     }
-                }
-            });
-            
-            // Atajos de teclado personalizados
-            document.addEventListener('keydown', function(e) {
-                if (!viewer.scene.pointclouds[0]) return;
+                });
                 
-                switch(e.key.toLowerCase()) {
-                    case 'f': // F - Fit to screen
-                        viewer.fitToScreen();
-                        break;
-                    case 'r': // R - Reset camera
-                        viewer.scene.view.position.set(0, 0, 10);
-                        viewer.scene.view.lookAt(new THREE.Vector3(0, 0, 0));
-                        break;
-                    case 'c': // C - Toggle classification
-                        let pc = viewer.scene.pointclouds[0];
-                        let material = pc.material;
-                        material.activeAttributeName = 
-                            material.activeAttributeName === 'rgba' ? 'classification' : 'rgba';
-                        break;
-                    case 'i': // I - Toggle intensity
-                        let pc2 = viewer.scene.pointclouds[0];
-                        let material2 = pc2.material;
-                        material2.activeAttributeName = 
-                            material2.activeAttributeName === 'rgba' ? 'intensity' : 'rgba';
-                        break;
-                }
-            });
-            
-            console.log("✓ Potree Viewer inicializado");
-            console.log("✓ Atajos: F=ajustar, R=reset cámara, C=clasificación, I=intensidad");
-        });
+                // Atajos de teclado personalizados
+                document.addEventListener('keydown', function(e) {
+                    if (!viewer.scene.pointclouds[0]) return;
+                    
+                    switch(e.key.toLowerCase()) {
+                        case 'f': // F - Fit to screen
+                            viewer.fitToScreen();
+                            console.log('Vista ajustada');
+                            break;
+                        case 'r': // R - Reset camera
+                            viewer.scene.view.position.set(0, 0, 10);
+                            viewer.scene.view.lookAt(new THREE.Vector3(0, 0, 0));
+                            console.log('Cámara reseteada');
+                            break;
+                        case 'c': // C - Toggle classification
+                            let pc = viewer.scene.pointclouds[0];
+                            let material = pc.material;
+                            material.activeAttributeName = 
+                                material.activeAttributeName === 'rgba' ? 'classification' : 'rgba';
+                            console.log('Modo de color:', material.activeAttributeName);
+                            break;
+                    }
+                });
+                
+                console.log('✓ Sistema de atajos activado');
+                
+            } catch (error) {
+                showError('Error al inicializar el visor: ' + error.message);
+            }
+        }
+
+        // Iniciar cuando todo esté cargado
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPotree);
+        } else {
+            // Esperar un poco para asegurar que los scripts externos carguen
+            setTimeout(initPotree, 500);
+        }
     </script>
 </body>
 </html>
